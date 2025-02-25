@@ -25,7 +25,7 @@ app.use(cors({ origin: "*", methods: ["POST", "GET"] }));
 app.post("/save", async (req, res) => {
   try {
     const jsonData = req.body.data; // Expecting an array inside an object
-
+    console.log(jsonData)
       if (!Array.isArray(jsonData) || jsonData.length === 0) {
           return res.status(400).json({ error: "Invalid JSON data format" });
       }
