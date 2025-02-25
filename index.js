@@ -25,10 +25,24 @@ const ListingSchema = new mongoose.Schema({
 // Dynamic model initialization to prevent OverwriteModelError
 const Listing = mongoose.models.AirbnbListing || mongoose.model("AirbnbListing", ListingSchema);
 
+// Connect to the database at startup
+let dbConnection;
+// Initialize database connection outside of request handlers
+(async () => {
+  try {
+    dbConnection = await connectToDatabase();
+    console.log('Database connected at startup');
+  } catch (error) {
+    console.error('Failed to establish database connection at startup:', error);
+  }
+})();
+
 app.post("/api/save", async (req, res) => {
   try {
-    // Connect to database first
-    await connectToDatabase();
+    // Use existing connection instead of connecting on each request
+    if (!dbConnection) {
+      dbConnection = await connectToDatabase();
+    }
     
     const jsonData = req.body.data;
 
@@ -37,14 +51,35 @@ app.post("/api/save", async (req, res) => {
     }
 
     if (Array.isArray(jsonData)) {
-      await Listing.insertMany(jsonData, { ordered: false }).catch((err) => {
+      // Add timeout for large operations
+      const timeout = setTimeout(() => {
+        console.log("Operation taking too long, responding early");
+        res.status(202).json({ 
+          message: `Processing ${jsonData.length} records in background`,
+          status: "processing" 
+        });
+      }, 5000); // 5 second timeout before responding
+
+      await Listing.insertMany(jsonData, { 
+        ordered: false,
+        // Add limits to prevent timeout
+        lean: true,
+        timeout: 30000  // 30 second MongoDB operation timeout
+      }).catch((err) => {
         console.error("Error inserting bulk data:", err);
       });
-      res.json({ message: `Saved ${jsonData.length} records to MongoDB` });
+      
+      clearTimeout(timeout);
+      
+      // Only send response if it hasn't been sent already
+      if (!res.headersSent) {
+        res.json({ message: `Saved ${jsonData.length} records to MongoDB` });
+      }
     } else {
       await Listing.findOneAndUpdate({ id: jsonData.id }, jsonData, {
         upsert: true,
         new: true,
+        lean: true  // Return plain JavaScript objects instead of Mongoose documents
       });
       res.json({ message: "Single record saved to MongoDB" });
     }
@@ -54,12 +89,16 @@ app.post("/api/save", async (req, res) => {
   }
 });
 
-app.get("/", async (req, res) => {
+app.get("/api", async (req, res) => {
   try {
-    // Connect to database first
-    await connectToDatabase();
+    // Use existing connection
+    if (!dbConnection) {
+      dbConnection = await connectToDatabase();
+    }
     
-    const listings = await Listing.find();
+    // Limit results to prevent timeouts
+    const listings = await Listing.find().limit(100).lean();
+    
     if (!listings.length) {
       return res.status(404).send("No data found in MongoDB.");
     }
@@ -76,7 +115,7 @@ app.get("/", async (req, res) => {
         </head>
         <body>
             <h2>Airbnb Listings</h2>
-            <p>Total Listings: ${listings.length}</p>
+            <p>Total Listings (showing max 100): ${listings.length}</p>
             <table>
                 <tr>
                     <th>No.</th>
@@ -109,6 +148,11 @@ app.get("/", async (req, res) => {
     console.error("Error retrieving data from MongoDB:", error);
     res.status(500).send("Error loading data");
   }
+});
+
+// Add a simple status endpoint that doesn't require DB access
+app.get("/api/status", (req, res) => {
+  res.json({ status: "online" });
 });
 
 // Listen only in development mode
