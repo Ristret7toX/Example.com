@@ -1,18 +1,15 @@
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
-const bodyParser = require("body-parser");
 
 // Load .env only in development
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log("MongoDB connected successfully"))
+  .catch(err => console.error("MongoDB connection error:", err));
 
 const ListingSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
