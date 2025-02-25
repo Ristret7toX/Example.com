@@ -28,9 +28,6 @@ const ListingSchema = new mongoose.Schema({
 // ✅ Fix: Prevent OverwriteModelError
 const Listing = mongoose.models.AirbnbListing || mongoose.model("AirbnbListing", ListingSchema);
 
-app.use(express.json());
-app.use(cors({ origin: "*", methods: ["POST", "GET"] }));
-
 app.post("/save", async (req, res) => {
   try {
     const jsonData = req.body.data;
