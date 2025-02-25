@@ -1,8 +1,6 @@
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
-app.use(express.json());
-
 // Load .env only in development
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
@@ -25,7 +23,6 @@ const ListingSchema = new mongoose.Schema({
 
 const Listing = mongoose.model("AirbnbListing", ListingSchema);
 
-const app = express();
 app.use(express.json());
 app.use(cors({ origin: "*", methods: ["POST", "GET"] }));
 
