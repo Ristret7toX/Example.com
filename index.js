@@ -24,28 +24,37 @@ app.use(cors({ origin: "*", methods: ["POST", "GET"] }));
 
 app.post("/save", async (req, res) => {
   try {
-    const jsonData = req.body.data; // Expecting an array inside an object
-    console.log(jsonData)
-      if (!Array.isArray(jsonData) || jsonData.length === 0) {
+      const jsonData = req.body.data; // Expecting a single object OR an array
+
+      if (!jsonData || (Array.isArray(jsonData) && jsonData.length === 0)) {
           return res.status(400).json({ error: "Invalid JSON data format" });
       }
 
-      let batch = db.batch();
-      jsonData.forEach((item) => {
-          if (item.id) {
-              const docRef = db.collection("airbnb_listings").doc(item.id);
-              batch.set(docRef, item);
+      if (Array.isArray(jsonData)) {
+          // Handle Bulk Insert
+          let batch = db.batch();
+          jsonData.forEach((item) => {
+              if (item.id) {
+                  const docRef = db.collection("airbnb_listings").doc(item.id);
+                  batch.set(docRef, item, { merge: true });
+              }
+          });
+          await batch.commit();
+          res.json({ message: `Saved ${jsonData.length} records to Firestore` });
+      } else {
+          // Handle Single Insert
+          if (!jsonData.id) {
+              return res.status(400).json({ error: "Missing ID for single record" });
           }
-      });
-
-      await batch.commit();
-      res.json({ message: `Saved ${jsonData.length} records to Firestore` });
+          const docRef = db.collection("airbnb_listings").doc(jsonData.id);
+          await docRef.set(jsonData, { merge: true });
+          res.json({ message: "Single record saved to Firestore" });
+      }
   } catch (error) {
       console.error("Error saving data to Firestore:", error);
       res.status(500).json({ error: "Failed to save data" });
   }
 });
-
 
 
 app.get("/", async (req, res) => {
