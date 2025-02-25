@@ -6,27 +6,11 @@ if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
 
+const Listing = require("./models/Listing");
+
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: "*" }));
-
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log("MongoDB connected successfully"))
-  .catch(err => console.error("MongoDB connection error:", err));
-
-const ListingSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true },
-  title: String,
-  description: String,
-  url: String,
-  host: {
-    name: String,
-    hostDetails: [String],
-  },
-});
-
-// ✅ Fix: Prevent OverwriteModelError
-const Listing = mongoose.models.AirbnbListing || mongoose.model("AirbnbListing", ListingSchema);
 
 app.post("/save", async (req, res) => {
   try {
