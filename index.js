@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const admin = require("firebase-admin");
+const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 
 // Load .env only in development
@@ -8,68 +8,62 @@ if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
 
-// Initialize Firebase
-admin.initializeApp({
-  credential: admin.credential.cert({
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-  }),
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
 });
 
-const db = admin.firestore();
+const ListingSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  title: String,
+  description: String,
+  url: String,
+  host: {
+    name: String,
+    hostDetails: [String],
+  },
+});
+
+const Listing = mongoose.model("AirbnbListing", ListingSchema);
+
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: "*", methods: ["POST", "GET"] }));
 
 app.post("/save", async (req, res) => {
   try {
-      const jsonData = req.body.data; // Expecting a single object OR an array
+    const jsonData = req.body.data;
 
-      if (!jsonData || (Array.isArray(jsonData) && jsonData.length === 0)) {
-          return res.status(400).json({ error: "Invalid JSON data format" });
-      }
+    if (!jsonData || (Array.isArray(jsonData) && jsonData.length === 0)) {
+      return res.status(400).json({ error: "Invalid JSON data format" });
+    }
 
-      if (Array.isArray(jsonData)) {
-          // Handle Bulk Insert
-          let batch = db.batch();
-          jsonData.forEach((item) => {
-              if (item.id) {
-                  const docRef = db.collection("airbnb_listings").doc(item.id);
-                  batch.set(docRef, item, { merge: true });
-              }
-          });
-          await batch.commit();
-          res.json({ message: `Saved ${jsonData.length} records to Firestore` });
-      } else {
-          // Handle Single Insert
-          if (!jsonData.id) {
-              return res.status(400).json({ error: "Missing ID for single record" });
-          }
-          const docRef = db.collection("airbnb_listings").doc(jsonData.id);
-          await docRef.set(jsonData, { merge: true });
-          res.json({ message: "Single record saved to Firestore" });
-      }
+    if (Array.isArray(jsonData)) {
+      await Listing.insertMany(jsonData, { ordered: false }).catch((err) => {
+        console.error("Error inserting bulk data:", err);
+      });
+      res.json({ message: `Saved ${jsonData.length} records to MongoDB` });
+    } else {
+      await Listing.findOneAndUpdate({ id: jsonData.id }, jsonData, {
+        upsert: true,
+        new: true,
+      });
+      res.json({ message: "Single record saved to MongoDB" });
+    }
   } catch (error) {
-      console.error("Error saving data to Firestore:", error);
-      res.status(500).json({ error: "Failed to save data" });
+    console.error("Error saving data to MongoDB:", error);
+    res.status(500).json({ error: "Failed to save data" });
   }
 });
 
-
 app.get("/", async (req, res) => {
   try {
-    const snapshot = await db.collection("airbnb_listings").get();
-    if (snapshot.empty) {
-      return res.status(404).send("No data found in Firestore.");
+    const listings = await Listing.find();
+    if (!listings.length) {
+      return res.status(404).send("No data found in MongoDB.");
     }
 
-    let uniqueData = [];
-    snapshot.forEach((doc) => {
-      uniqueData.push(doc.data());
-    });
-
-    // Generate HTML table
     let html = `
         <html>
         <head>
@@ -82,7 +76,7 @@ app.get("/", async (req, res) => {
         </head>
         <body>
             <h2>Airbnb Listings</h2>
-            <p>Total Listings: ${uniqueData.length}</p>
+            <p>Total Listings: ${listings.length}</p>
             <table>
                 <tr>
                     <th>No.</th>
@@ -93,8 +87,7 @@ app.get("/", async (req, res) => {
                     <th>Host Details</th>
                 </tr>`;
 
-    // Add rows to the table
-    uniqueData.forEach((item, index) => {
+    listings.forEach((item, index) => {
       const host = item.host || {};
       const hostDetails = host.hostDetails ? host.hostDetails.join("<br>") : "No details available";
 
@@ -113,7 +106,7 @@ app.get("/", async (req, res) => {
 
     res.send(html);
   } catch (error) {
-    console.error("Error retrieving data from Firestore:", error);
+    console.error("Error retrieving data from MongoDB:", error);
     res.status(500).send("Error loading data");
   }
 });
