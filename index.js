@@ -1,19 +1,35 @@
 const express = require("express");
-const mongoose = require("mongoose");
 const cors = require("cors");
+const connectToDatabase = require("./utils/db");
+const mongoose = require("mongoose");
 
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
 
-const Listing = require("./models/Listing");
-
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: "*" }));
 
-app.post("/save", async (req, res) => {
+const ListingSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  title: String,
+  description: String,
+  url: String,
+  host: {
+    name: String,
+    hostDetails: [String],
+  },
+});
+
+// Dynamic model initialization to prevent OverwriteModelError
+const Listing = mongoose.models.AirbnbListing || mongoose.model("AirbnbListing", ListingSchema);
+
+app.post("/api/save", async (req, res) => {
   try {
+    // Connect to database first
+    await connectToDatabase();
+    
     const jsonData = req.body.data;
 
     if (!jsonData || (Array.isArray(jsonData) && jsonData.length === 0)) {
@@ -40,6 +56,9 @@ app.post("/save", async (req, res) => {
 
 app.get("/", async (req, res) => {
   try {
+    // Connect to database first
+    await connectToDatabase();
+    
     const listings = await Listing.find();
     if (!listings.length) {
       return res.status(404).send("No data found in MongoDB.");
@@ -92,4 +111,13 @@ app.get("/", async (req, res) => {
   }
 });
 
+// Listen only in development mode
+if (process.env.NODE_ENV !== 'production') {
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
+}
+
+// Export for Vercel serverless deployment
 module.exports = app;
