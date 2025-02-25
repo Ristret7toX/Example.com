@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+app.use(express.json());
 
 // Load .env only in development
 if (process.env.NODE_ENV !== "production") {
