@@ -22,28 +22,29 @@ app.use(express.json());
 app.use(cors({ origin: "*", methods: ["POST", "GET"] }));
 
 app.post("/save", async (req, res) => {
-  console.log("someone calling save")
-    try {
-      const jsonData = req.body; // Expecting an array of JSON objects
+  try {
+      const jsonData = req.body;
+
       if (!Array.isArray(jsonData) || jsonData.length === 0) {
-        return res.status(400).json({ error: "Invalid JSON data format" });
+          return res.status(400).json({ error: "Invalid JSON data format" });
       }
-  
+
       let batch = db.batch();
       jsonData.forEach((item) => {
-        if (item.id) {
-          const docRef = db.collection("airbnb_listings").doc(item.id);
-          batch.set(docRef, item);
-        }
+          if (item.id) {
+              const docRef = db.collection("airbnb_listings").doc(item.id);
+              batch.set(docRef, item);
+          }
       });
-  
+
       await batch.commit();
       res.json({ message: `Saved ${jsonData.length} records to Firestore` });
-    } catch (error) {
+  } catch (error) {
       console.error("Error saving data to Firestore:", error);
       res.status(500).json({ error: "Failed to save data" });
-    }
-  });
+  }
+});
+
 
 
 app.get("/", async (req, res) => {
