@@ -22,6 +22,7 @@ app.use(express.json());
 app.use(cors({ origin: "*", methods: ["POST", "GET"] }));
 
 app.post("/save", async (req, res) => {
+  console.log("someone calling save")
     try {
       const jsonData = req.body; // Expecting an array of JSON objects
       if (!Array.isArray(jsonData) || jsonData.length === 0) {
