@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const admin = require("firebase-admin");
+const bodyParser = require("body-parser");
 
 // Load .env only in development
 if (process.env.NODE_ENV !== "production") {
@@ -23,7 +24,7 @@ app.use(cors({ origin: "*", methods: ["POST", "GET"] }));
 
 app.post("/save", async (req, res) => {
   try {
-      const jsonData = req.body;
+    const jsonData = req.body.data; // Expecting an array inside an object
 
       if (!Array.isArray(jsonData) || jsonData.length === 0) {
           return res.status(400).json({ error: "Invalid JSON data format" });
