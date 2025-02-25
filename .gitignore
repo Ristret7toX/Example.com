@@ -2,4 +2,4 @@ dbjson/
 send.js
 server.js
 node_modules/
-process.env
+.env
